@@ -8,7 +8,6 @@ import {
   isSingBox,
   selectProxyAPI,
 } from '@/api'
-import { useNotification } from '@/composables/notification'
 import {
   GLOBAL,
   IPV6_TEST_URL,
@@ -18,9 +17,10 @@ import {
   TEST_URL,
 } from '@/constant'
 import { isProxyGroup } from '@/helper'
+import { showNotification } from '@/helper/notification'
 import type { Proxy, ProxyProvider } from '@/types'
 import { useStorage } from '@vueuse/core'
-import { debounce, last } from 'lodash'
+import { last } from 'lodash'
 import { computed, ref } from 'vue'
 import { activeConnections } from './connections'
 import {
@@ -42,17 +42,19 @@ export const IPv6Map = useStorage<Record<string, boolean>>('config/ipv6-map', {}
 export const hiddenGroupMap = useStorage<Record<string, boolean>>('config/hidden-group-map', {})
 export const proxyProviederList = ref<ProxyProvider[]>([])
 
-export const getTestUrl = (groupName?: string) => {
-  const defaultUrl = speedtestUrl.value || TEST_URL
+const speedtestUrlWithDefault = computed(() => {
+  return speedtestUrl.value || TEST_URL
+})
 
+export const getTestUrl = (groupName?: string) => {
   if (!groupName || !independentLatencyTest.value) {
-    return defaultUrl
+    return speedtestUrlWithDefault.value
   }
 
   const proxyNode =
     proxyMap.value[groupName] || proxyProviederList.value.find((p) => p.name === groupName)
 
-  return proxyNode?.testUrl || defaultUrl
+  return proxyNode?.testUrl || speedtestUrlWithDefault.value
 }
 
 export const getLatencyByName = (proxyName: string, groupName?: string) => {
@@ -181,11 +183,10 @@ const latencyTestForSingle = async (proxyName: string, url: string, timeout: num
 
   return await fetchProxyLatencyAPI(independentLatencyTest.value ? proxyName : now, url, timeout)
 }
-const { showNotification } = useNotification()
 
 export const proxyLatencyTest = async (
   proxyName: string,
-  url = speedtestUrl.value,
+  url = speedtestUrlWithDefault.value,
   timeout = speedtestTimeout.value,
 ) => {
   const res = await latencyTestForSingle(proxyName, url, timeout)
@@ -206,6 +207,7 @@ const latencyTip = (finished: number, total: number, failed: number) => {
   if (isFinished) {
     showNotification({
       content: 'testFinishedResultTip',
+      key: 'latencyTestResult',
       params: {
         success: `${total - failed}`,
         failed: `${failed}`,
@@ -216,6 +218,7 @@ const latencyTip = (finished: number, total: number, failed: number) => {
   } else {
     showNotification({
       content: 'testFinishedTip',
+      key: 'latencyTestResult',
       params: {
         number: `${finished}/${total}`,
       },
@@ -225,31 +228,42 @@ const latencyTip = (finished: number, total: number, failed: number) => {
   }
 }
 
-const fetchProxiesDebounced = debounce(fetchProxies, 800)
-const proxyLatencyTestDebounced = async (
-  proxyName: string,
-  url = speedtestUrl.value,
-  timeout = speedtestTimeout.value,
-) => {
-  const res = await latencyTestForSingle(proxyName, url, timeout)
-  await fetchProxiesDebounced()
-  return res
+const setHistory = (proxyName: string, delay: number) => {
+  const history = getHistoryByName(proxyName)
+  const now = new Date()
+
+  history.push({
+    time: now.toISOString(),
+    delay,
+  })
 }
 
-const testLatencyOneByOneWithTip = async (nodes: string[], url = speedtestUrl.value) => {
+const testLatencyOneByOneWithTip = async (nodes: string[], url = speedtestUrlWithDefault.value) => {
   let testDone = 0
   let testFailed = 0
 
-  return await Promise.all(
+  await Promise.allSettled(
     nodes.map(async (name) => {
-      const res = await proxyLatencyTestDebounced(name, url, Math.min(3000, speedtestTimeout.value))
-      testDone++
-      if (res.status !== 200) {
+      try {
+        const res = await latencyTestForSingle(name, url, Math.min(3000, speedtestTimeout.value))
+        testDone++
+        if (res.status !== 200) {
+          testFailed++
+          setHistory(name, NOT_CONNECTED)
+        } else {
+          setHistory(name, res.data.delay)
+        }
+        latencyTip(testDone, nodes.length, testFailed)
+        return res
+      } catch (error) {
+        testDone++
         testFailed++
+        latencyTip(testDone, nodes.length, testFailed)
+        throw error
       }
-      latencyTip(testDone, nodes.length, testFailed)
     }),
   )
+  await fetchProxies()
 }
 
 export const proxyGroupLatencyTest = async (proxyGroupName: string) => {
