@@ -6,6 +6,8 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { version } from './package.json'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 const getGitCommitId = (): string => {
   try {
     const commitMessage = execSync('git log -1 --pretty=%B', { encoding: 'utf8' }).trim()
@@ -28,46 +30,42 @@ export default defineConfig({
     __COMMIT_ID__: JSON.stringify(getGitCommitId()),
   },
   base: './',
-  plugins: [
-    vue(),
-    vueJsx(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'favicon-dark.svg'],
-      manifest: {
-        name: 'zashboard',
-        short_name: 'zashboard',
-        description: 'a dashboard using clash api',
-        theme_color: '#000000',
-        icons: [
-          {
-            src: './pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: './pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
-          },
-          {
-            src: './pwa-maskable-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-          {
-            src: './pwa-maskable-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
-          },
-        ],
-      },
-    }),
-  ],
+  plugins: [vue(), vueJsx(), VitePWA({
+    registerType: 'autoUpdate',
+    includeAssets: ['favicon.svg', 'favicon-dark.svg'],
+    manifest: {
+      name: 'zashboard',
+      short_name: 'zashboard',
+      description: 'a dashboard using clash api',
+      theme_color: '#000000',
+      icons: [
+        {
+          src: './pwa-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: './pwa-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: './pwa-maskable-192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'maskable',
+        },
+        {
+          src: './pwa-maskable-512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'maskable',
+        },
+      ],
+    },
+  }), cloudflare()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
