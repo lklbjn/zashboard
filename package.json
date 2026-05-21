@@ -16,8 +16,9 @@
     "format": "prettier --write src/",
     "lint": "eslint . --fix",
     "prepare": "husky",
-    "preview": "vite preview",
-    "type-check": "vue-tsc --build --force"
+    "preview": "pnpm run build && wrangler dev",
+    "type-check": "vue-tsc --build --force",
+    "deploy": "pnpm run build && wrangler deploy"
   },
   "dependencies": {
     "@eslint/plugin-kit": "^0.7.1",
@@ -52,6 +53,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.2",
     "@tailwindcss/postcss": "^4.2.4",
     "@tsconfig/node22": "^22.0.5",
     "@types/lodash": "^4.17.24",
@@ -74,7 +76,8 @@
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.3",
     "vite": "^8.0.10",
-    "vue-tsc": "^3.2.8"
+    "vue-tsc": "^3.2.8",
+    "wrangler": "^4.93.0"
   },
   "packageManager": "pnpm@10.15.0"
 }
